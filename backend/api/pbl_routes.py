@@ -1,13 +1,14 @@
-from flask import request, jsonify
+from flask import Blueprint, request, jsonify
 from datetime import datetime
 import uuid
 
-from app import app
+pbl_bp = Blueprint('pbl', __name__)
+
 # ============================================================================
 # PBL ROUTES (BR5, BR9)
 # ============================================================================
 
-@app.route('/api/projects', methods=['GET'])
+@pbl_bp.route('/projects', methods=['GET'])
 def list_projects():
     """
     BR9: Get all projects for a teacher or student
@@ -34,7 +35,7 @@ def list_projects():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/projects/<project_id>', methods=['GET'])
+@pbl_bp.route('/projects/<project_id>', methods=['GET'])
 def get_project_details(project_id):
     """
     BR9: Get detailed project information
@@ -69,7 +70,7 @@ def get_project_details(project_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/soft-skills/assess', methods=['POST'])
+@pbl_bp.route('/soft-skills/assess', methods=['POST'])
 def submit_soft_skill_assessment():
     """
     BR5: Submit peer review or self-assessment
@@ -137,7 +138,7 @@ def submit_soft_skill_assessment():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/soft-skills/team/<team_id>', methods=['GET'])
+@pbl_bp.route('/soft-skills/team/<team_id>', methods=['GET'])
 def get_team_soft_skills(team_id):
     """
     BR5: Get aggregated soft skill scores for a team

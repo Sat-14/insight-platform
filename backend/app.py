@@ -201,12 +201,14 @@ if __name__ == "__main__":
 
     print("\n" + "=" * 60)
     print("🚀 AMEP Backend Server Starting...")
-    print("=" * 60)
-    print(f"Environment: {app.config.get('ENV')}")
-    print(f"Debug Mode: {app.config.get('DEBUG')}")
-    print(f"Port: {app.config.get('PORT')}")
-    print("=" * 60 + "\n")
-
+    print("="*60)
+    print(f"Environment: {app.config['ENV']}")
+    print(f"Debug Mode: {app.config['DEBUG']}")
+    print(f"Database: {app.config['MONGODB_URI'][:30]}...")
+    print(f"Port: {app.config['PORT']}")
+    print("="*60 + "\n")
+    
+    # Run with SocketIO
     socketio.run(
         app,
         host=app.config.get("HOST", "0.0.0.0"),
