@@ -54,15 +54,15 @@ class Config:
         'socketTimeoutMS': 30000,
     }
     
-    # MongoDB Atlas settings (if using cloud)
-    MONGODB_USERNAME = os.getenv('MONGODB_USERNAME')
-    MONGODB_PASSWORD = os.getenv('MONGODB_PASSWORD')
-    MONGODB_CLUSTER = os.getenv('MONGODB_CLUSTER')
+    # # MongoDB Atlas settings (if using cloud)
+    # MONGODB_USERNAME = os.getenv('MONGODB_USERNAME')
+    # MONGODB_PASSWORD = os.getenv('MONGODB_PASSWORD')
+    # MONGODB_CLUSTER = os.getenv('MONGODB_CLUSTER')
     
-    # If using MongoDB Atlas, construct URI
-    if MONGODB_USERNAME and MONGODB_PASSWORD and MONGODB_CLUSTER:
-        MONGODB_URI = f"mongodb+srv://{MONGODB_USERNAME}:{MONGODB_PASSWORD}@{MONGODB_CLUSTER}/{MONGODB_DB_NAME}?retryWrites=true&w=majority"
-        MONGODB_SETTINGS['host'] = MONGODB_URI
+    # # If using MongoDB Atlas, construct URI
+    # if MONGODB_USERNAME and MONGODB_PASSWORD and MONGODB_CLUSTER:
+    #     MONGODB_URI = f"mongodb+srv://{MONGODB_USERNAME}:{MONGODB_PASSWORD}@{MONGODB_CLUSTER}/{MONGODB_DB_NAME}?retryWrites=true&w=majority"
+    #     MONGODB_SETTINGS['host'] = MONGODB_URI
     
     # ========================================================================
     # REDIS CONFIGURATION (for caching and sessions)
