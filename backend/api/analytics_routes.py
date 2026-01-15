@@ -1,13 +1,14 @@
-from flask import request, jsonify
+from flask import Blueprint, request, jsonify
 from datetime import datetime
 import uuid
 
-from app import app
+analytics_bp = Blueprint('analytics', __name__)
+
 # ============================================================================
 # TEACHER PRODUCTIVITY ROUTES (BR7, BR8)
 # ============================================================================
 
-@app.route('/api/templates', methods=['GET'])
+@analytics_bp.route('/templates', methods=['GET'])
 def list_templates():
     """
     BR7: Get curriculum-aligned templates
@@ -36,7 +37,7 @@ def list_templates():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/analytics/unified', methods=['GET'])
+@analytics_bp.route('/unified', methods=['GET'])
 def get_unified_analytics():
     """
     BR8: Get unified institutional metrics
@@ -64,7 +65,7 @@ def get_unified_analytics():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/interventions/track', methods=['POST'])
+@analytics_bp.route('/interventions/track', methods=['POST'])
 def track_intervention():
     """
     BR6: Track teacher intervention and measure impact

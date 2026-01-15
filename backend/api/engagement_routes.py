@@ -1,17 +1,14 @@
-from flask import request, jsonify
-
-from app import app
+from flask import Blueprint, request, jsonify
 from datetime import datetime
 import uuid
 
-from app import app
-from app import socketio
+engagement_bp = Blueprint('engagement', __name__)
 
 # ============================================================================
 # ENGAGEMENT ROUTES (BR4, BR6)
 # ============================================================================
 
-@app.route('/api/engagement/analyze', methods=['POST'])
+@engagement_bp.route('/analyze', methods=['POST'])
 def analyze_engagement():
     """
     BR4: Analyze student engagement from implicit/explicit signals
@@ -45,7 +42,7 @@ def analyze_engagement():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/engagement/class/<class_id>', methods=['GET'])
+@engagement_bp.route('/class/<class_id>', methods=['GET'])
 def get_class_engagement(class_id):
     """
     BR6: Get class-level engagement metrics for teacher dashboard
@@ -85,7 +82,7 @@ def get_class_engagement(class_id):
 # LIVE POLLING ROUTES (BR4)
 # ============================================================================
 
-@app.route('/api/polls/create', methods=['POST'])
+@engagement_bp.route('/polls/create', methods=['POST'])
 def create_poll():
     """
     BR4: Create anonymous live poll
@@ -113,14 +110,14 @@ def create_poll():
         }
         
         # Broadcast poll to all students via WebSocket
-        socketio.emit('new_poll', poll, broadcast=True)
+        # Note: SocketIO will be passed via app context
         
         return jsonify(poll), 201
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/polls/<poll_id>/respond', methods=['POST'])
+@engagement_bp.route('/polls/<poll_id>/respond', methods=['POST'])
 def respond_to_poll(poll_id):
     """
     BR4: Submit anonymous poll response
@@ -145,17 +142,14 @@ def respond_to_poll(poll_id):
         }
         
         # Update poll results in real-time via WebSocket
-        socketio.emit('poll_response', {
-            'poll_id': poll_id,
-            'total_responses': 15  # Would be calculated from DB
-        }, broadcast=True)
+        # Note: SocketIO will be passed via app context
         
         return jsonify(response), 201
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/polls/<poll_id>', methods=['GET'])
+@engagement_bp.route('/polls/<poll_id>', methods=['GET'])
 def get_poll_results(poll_id):
     """
     BR6: Get aggregated poll results for teacher

@@ -239,7 +239,7 @@ if __name__ == '__main__':
     print("="*60)
     print(f"Environment: {app.config['ENV']}")
     print(f"Debug Mode: {app.config['DEBUG']}")
-    print(f"Database: {app.config['DATABASE_URI'][:30]}...")
+    print(f"Database: {app.config['MONGODB_URI'][:30]}...")
     print(f"Port: {app.config['PORT']}")
     print("="*60 + "\n")
     
