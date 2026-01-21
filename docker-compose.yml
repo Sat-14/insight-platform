@@ -1,15 +1,108 @@
 version: '3.8'
 
 services:
-  app:
-    build: .
-    container_name: insight-platform-dev
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: amep-mongodb
+    restart: unless-stopped
     ports:
-      - "3000:3000"
-    volumes:
-      - .:/usr/src/app
-      - /usr/src/app/node_modules
+      - "27017:27017"
     environment:
-      - NODE_ENV=development
-    # If your app requires a database (e.g., MongoDB or Postgres), 
-    # you can add it as another service here.
+      MONGO_INITDB_ROOT_USERNAME: amep_admin
+      MONGO_INITDB_ROOT_PASSWORD: amep_password
+      MONGO_INITDB_DATABASE: amep_db
+    volumes:
+      - mongodb_data:/data/db
+      - ./database/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    networks:
+      - amep-network
+
+  # Redis for Caching & Celery
+  redis:
+    image: redis:7-alpine
+    container_name: amep-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - amep-network
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: amep-backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=True
+      - MONGODB_URI=mongodb://amep_admin:amep_password@mongodb:27017/
+      - MONGODB_DB_NAME=amep_db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - SECRET_KEY=dev-secret-key-change-in-production
+      - JWT_SECRET_KEY=jwt-secret-key-change-in-production
+    depends_on:
+      - mongodb
+      - redis
+    volumes:
+      - ./backend:/app
+    networks:
+      - amep-network
+    command: python app.py
+
+  # Celery Worker for Async Tasks
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: amep-celery-worker
+    restart: unless-stopped
+    environment:
+      - FLASK_ENV=development
+      - MONGODB_URI=mongodb://amep_admin:amep_password@mongodb:27017/
+      - MONGODB_DB_NAME=amep_db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+    depends_on:
+      - mongodb
+      - redis
+    volumes:
+      - ./backend:/app
+    networks:
+      - amep-network
+    command: celery -A celery_app worker --loglevel=info
+
+  # Frontend React App
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: amep-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:5000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - amep-network
+    command: npm run dev
+
+networks:
+  amep-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+    driver: local
+  redis_data:
+    driver: local
