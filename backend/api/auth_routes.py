@@ -23,7 +23,11 @@ from models.database import (
     update_one
 )
 
+# Import logging
+from utils.logger import get_logger, log_authentication
+
 auth_bp = Blueprint('auth', __name__)
+logger = get_logger(__name__)
 
 # JWT Configuration
 JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'dev-jwt-secret-change-in-production')

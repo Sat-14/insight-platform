@@ -14,9 +14,14 @@ import os
 # Import configuration
 from config import Config
 
+# Import logging
+from utils.logger import get_logger, log_request_middleware
 
 # Import database
 from models.database import init_db
+
+# Setup logger
+logger = get_logger(__name__)
 
 # ============================================================================
 # APP INITIALIZATION
@@ -24,11 +29,19 @@ from models.database import init_db
 
 def create_app(config_class=Config):
     """Application factory pattern"""
+    logger.info("=" * 60)
+    logger.info("AMEP Application Initialization Starting...")
+    logger.info("=" * 60)
+
     app = Flask(__name__)
     app.config.from_object(config_class)
 
+    logger.info(f"Environment: {app.config['ENV']}")
+    logger.info(f"Debug Mode: {app.config['DEBUG']}")
+
     # Enable CORS
     CORS(app, origins=app.config["CORS_ORIGINS"])
+    logger.info(f"CORS enabled for origins: {app.config['CORS_ORIGINS']}")
 
     # Initialize SocketIO
     socketio = SocketIO(
@@ -36,12 +49,19 @@ def create_app(config_class=Config):
         cors_allowed_origins=app.config["CORS_ORIGINS"],
         async_mode="threading"  # safer than eventlet unless explicitly installed
     )
+    logger.info("SocketIO initialized with threading mode")
 
     # Make socketio accessible in blueprints
     app.extensions["socketio"] = socketio
 
     # Initialize database
+    logger.info("Initializing database connection...")
     init_db(app)
+    logger.info("Database initialized successfully")
+
+    # Setup request logging middleware
+    log_request_middleware(app)
+    logger.info("Request logging middleware enabled")
 
     # Register blueprints
     register_blueprints(app)
@@ -52,6 +72,10 @@ def create_app(config_class=Config):
     # Register error handlers
     register_error_handlers(app)
 
+    logger.info("=" * 60)
+    logger.info("AMEP Application Initialization Complete")
+    logger.info("=" * 60)
+
     return app, socketio
 
 
@@ -61,6 +85,8 @@ def create_app(config_class=Config):
 
 def register_blueprints(app):
     """Register all API route blueprints"""
+    logger.info("Registering API blueprints...")
+
     from api.auth_routes import auth_bp
     from api.mastery_routes import mastery_bp
     from api.engagement_routes import engagement_bp
@@ -68,12 +94,21 @@ def register_blueprints(app):
     from api.analytics_routes import analytics_bp
 
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
-    app.register_blueprint(mastery_bp, url_prefix="/api/mastery")
-    app.register_blueprint(engagement_bp, url_prefix="/api/engagement")
-    app.register_blueprint(pbl_bp, url_prefix="/api/pbl")
-    app.register_blueprint(analytics_bp, url_prefix="/api/analytics")
+    logger.info("Registered: /api/auth (Authentication)")
 
-    print("✓ All blueprints registered")
+    app.register_blueprint(mastery_bp, url_prefix="/api/mastery")
+    logger.info("Registered: /api/mastery (Knowledge Tracing)")
+
+    app.register_blueprint(engagement_bp, url_prefix="/api/engagement")
+    logger.info("Registered: /api/engagement (Engagement Detection)")
+
+    app.register_blueprint(pbl_bp, url_prefix="/api/pbl")
+    logger.info("Registered: /api/pbl (Project-Based Learning)")
+
+    app.register_blueprint(analytics_bp, url_prefix="/api/analytics")
+    logger.info("Registered: /api/analytics (Analytics & Templates)")
+
+    logger.info("All blueprints registered successfully")
 
 
 # ============================================================================
@@ -82,10 +117,11 @@ def register_blueprints(app):
 
 def register_socketio_events(socketio):
     """Register all SocketIO event handlers"""
+    logger.info("Registering SocketIO events...")
 
     @socketio.on("connect")
     def handle_connect():
-        print("✓ Client connected")
+        logger.info("WebSocket: Client connected")
         emit("connected", {
             "message": "Connected to AMEP server",
             "timestamp": datetime.utcnow().isoformat()
@@ -93,7 +129,7 @@ def register_socketio_events(socketio):
 
     @socketio.on("disconnect")
     def handle_disconnect():
-        print("✗ Client disconnected")
+        logger.info("WebSocket: Client disconnected")
 
     @socketio.on("join_class")
     def handle_join_class(data):
@@ -104,6 +140,7 @@ def register_socketio_events(socketio):
         role = data.get("role", "student")
 
         join_room(class_id)
+        logger.info(f"WebSocket: User {user_id} ({role}) joined class {class_id}")
 
         emit(
             "user_joined",
@@ -116,8 +153,6 @@ def register_socketio_events(socketio):
             skip_sid=True
         )
 
-        print(f"✓ User {user_id} joined class {class_id}")
-
     @socketio.on("leave_class")
     def handle_leave_class(data):
         from flask_socketio import leave_room
@@ -126,38 +161,46 @@ def register_socketio_events(socketio):
         user_id = data.get("user_id")
 
         leave_room(class_id)
-        print(f"✗ User {user_id} left class {class_id}")
+        logger.info(f"WebSocket: User {user_id} left class {class_id}")
 
     @socketio.on("poll_response_submitted")
     def handle_poll_response(data):
+        poll_id = data.get("poll_id")
+        class_id = data.get("class_id")
+        logger.info(f"WebSocket: Poll response submitted | Poll: {poll_id} | Class: {class_id}")
+
         emit(
             "poll_updated",
             {
-                "poll_id": data.get("poll_id"),
+                "poll_id": poll_id,
                 "total_responses": data.get("total_responses", 0),
                 "timestamp": datetime.utcnow().isoformat()
             },
-            room=data.get("class_id"),
+            room=class_id,
             broadcast=True
         )
 
     @socketio.on("engagement_alert")
     def handle_engagement_alert(data):
         class_id = data.get("class_id")
+        student_id = data.get("student_id")
+        severity = data.get("severity")
+
+        logger.info(f"WebSocket: Engagement alert | Student: {student_id} | Severity: {severity} | Class: {class_id}")
 
         emit(
             "engagement_alert_received",
             {
-                "student_id": data.get("student_id"),
+                "student_id": student_id,
                 "alert_type": data.get("alert_type"),
-                "severity": data.get("severity"),
+                "severity": severity,
                 "message": data.get("message"),
                 "timestamp": datetime.utcnow().isoformat()
             },
             room=f"teachers_{class_id}"
         )
 
-    print("✓ All SocketIO events registered")
+    logger.info("All SocketIO events registered")
 
 
 # ============================================================================
@@ -197,7 +240,7 @@ def register_error_handlers(app):
     register_handlers(app)
     register_custom_error_handlers(app)
 
-    print("✓ Error handlers registered")
+    logger.info("Error handlers registered")
 
 
 # ============================================================================
