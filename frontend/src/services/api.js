@@ -68,7 +68,7 @@ export const practiceAPI = {
 
 export const classroomAPI = {
   getStudentClasses: (studentId) => api.get(`/classroom/classrooms/student/${studentId}`),
-  getTeacherClasses: (teacherId) => api.get(`/classroom/classrooms/teacher/${teacherId}`),
+  getTeacherClasses: (teacherId) => api.get(`/classroom/teacher/${teacherId}/classrooms`),
   joinClass: (data) => api.post('/classroom/classrooms/join', data),
   getClassStream: (classId) => api.get(`/classroom/classrooms/${classId}/stream`),
   getAssignment: (assignmentId) => api.get(`/classroom/assignments/${assignmentId}`),
