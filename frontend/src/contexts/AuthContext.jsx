@@ -12,28 +12,27 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  // Load user from localStorage on mount
-  useEffect(() => {
-    const storedToken = localStorage.getItem('token');
+  const [token, setToken] = useState(() => localStorage.getItem('token'));
+  const [user, setUser] = useState(() => {
     const storedUser = localStorage.getItem('user');
+    try {
+      return storedUser ? JSON.parse(storedUser) : null;
+    } catch (error) {
+      console.error('Error parsing stored user data:', error);
+      return null;
+    }
+  });
+  const [loading, setLoading] = useState(false);
 
-    if (storedToken && storedUser) {
-      try {
-        const userData = JSON.parse(storedUser);
-        setToken(storedToken);
-        setUser(userData);
-      } catch (error) {
-        console.error('Error parsing stored user data:', error);
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+  // Effect to sync state with localStorage (optional, but good for cleanup if needed)
+  useEffect(() => {
+    if (!token || !user) {
+      // If state is cleared but localStorage remains (edge case), clean it up
+      if (!token && !user) {
+        // ensure consistency
       }
     }
-    setLoading(false);
-  }, []);
+  }, [token, user]);
 
   const login = async (credentials) => {
     try {
