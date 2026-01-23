@@ -30,12 +30,15 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Token expired or invalid
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      // Redirect to login if not already there
-      if (window.location.pathname !== '/') {
-        window.location.href = '/';
+      const isLoginRequest = error.config?.url?.includes('/auth/login');
+      const isRegisterRequest = error.config?.url?.includes('/auth/register');
+
+      if (!isLoginRequest && !isRegisterRequest) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        if (window.location.pathname !== '/') {
+          window.location.href = '/';
+        }
       }
     }
     return Promise.reject(error);
@@ -128,6 +131,12 @@ export const projectsAPI = {
   getTeamSoftSkillsSummary: (teamId) => api.get(`/pbl/teams/${teamId}/soft-skills-summary`),
   getStages: () => api.get('/pbl/stages'),
   getDimensions: () => api.get('/pbl/dimensions'),
+  // CRUD Extensions
+  deleteMilestone: (milestoneId) => api.delete(`/pbl/milestones/${milestoneId}`),
+  updateMilestone: (milestoneId, data) => api.put(`/pbl/milestones/${milestoneId}`, data),
+  getProjectMilestones: (projectId) => api.get(`/pbl/projects/${projectId}/milestones`),
+  getProjectDeliverables: (projectId) => api.get(`/pbl/projects/${projectId}/deliverables`),
+  updateDeliverableGrade: (deliverableId, data) => api.put(`/pbl/deliverables/${deliverableId}/grade`, data),
 };
 
 export const templatesAPI = {

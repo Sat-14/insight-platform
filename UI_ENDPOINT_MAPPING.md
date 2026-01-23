@@ -54,6 +54,7 @@ Complete backend API documentation with request/response formats.
 | `/alerts/{alert_id}` | PUT | `{severity?, notes?, recommendation?, resolved?}` | `{message}` |
 | `/alerts/{alert_id}` | DELETE | - | `{message}` |
 | `/alerts/{alert_id}/acknowledge` | POST | - | `{message}` |
+| `/student/{student_id}/gamification` | GET | - | `{student_id, total_xp, level, badges_earned, achievements}` |
 
 ---
 
@@ -126,6 +127,7 @@ Complete backend API documentation with request/response formats.
 | `/templates/{template_id}/use` | POST | `{teacher_id, classroom_id?, assignment_id?}` | `{usage_count, message}` |
 | `/teachers/{teacher_id}/templates` | GET | Query: `?include_private` | `[{template_id, title, template_type, usage_count, rating}]` |
 | `/templates/popular` | GET | Query: `?limit` | `[{template_id, title, subject_area, usage_count, rating}]` |
+| `/templates/seed` | POST | - | `{message, templates_created}` |
 
 ---
 
@@ -185,6 +187,7 @@ Complete backend API documentation with request/response formats.
 | `/deliverables/{deliverable_id}` | DELETE | - | `{message}` |
 | `/deliverables/{deliverable_id}/grade` | GET | - | `{deliverable_id, grade, feedback, graded_by, graded_at}` |
 | `/deliverables/{deliverable_id}/grade` | PUT | `{grade, feedback}` | `{message}` |
+| `/projects/{project_id}/deliverables` | GET | - | `[{deliverable_id, team_id, deliverable_type, file_url, submitted_at, graded, grade}]` |
 | `/teams/{team_id}/tasks` | POST | `{title, assigned_to, due_date}` | `{task_id, message}` |
 | `/teams/{team_id}/tasks` | GET | - | `{team_id, tasks, total_tasks, completed_tasks}` |
 | `/tasks/{task_id}` | PUT | `{title?, assigned_to?, due_date?, status?}` | `{message}` |
@@ -220,17 +223,17 @@ Complete backend API documentation with request/response formats.
 
 ## Summary
 
-**Total Endpoints:** 145 endpoints across 11 blueprints (after gamification)
+**Total Endpoints:** 150 endpoints across 11 blueprints
 
 **Blueprints:**
-1. `auth_routes.py` - 6 endpoints (authentication)
-2. `dashboard_routes.py` - 14 endpoints (teacher dashboard, interventions)
+1. `auth_routes.py` - 4 endpoints (authentication, excluding test endpoints)
+2. `dashboard_routes.py` - 17 endpoints (dashboards, interventions, analytics)
 3. `live_polling_routes.py` - 5 endpoints (live polling)
-4. `engagement_routes.py` - 11 endpoints (engagement tracking)
-5. `pbl_workflow_routes.py` - 28 endpoints (PBL workflows + gamification)
-6. `pbl_crud_extensions.py` - 17 endpoints (PBL CRUD)
+4. `engagement_routes.py` - 12 endpoints (engagement tracking, gamification)
+5. `pbl_workflow_routes.py` - 29 endpoints (PBL workflows + gamification)
+6. `pbl_crud_extensions.py` - 18 endpoints (PBL CRUD)
 7. `polling_template_crud.py` - 14 endpoints (polling/template CRUD)
-8. `template_routes.py` - 7 endpoints (curriculum templates)
+8. `template_routes.py` - 8 endpoints (curriculum templates)
 9. `classroom_routes.py` - 26 endpoints (classroom management)
 10. `mastery_concepts_routes.py` - 10 endpoints (mastery concepts/items)
 11. `mastery_routes.py` - 7 endpoints (mastery system)
@@ -249,7 +252,7 @@ Complete backend API documentation with request/response formats.
 - ✅ 7 redundant endpoints merged for cleaner API
 - ✅ 100% workflow completeness achieved
 
-**Previous:** 138 endpoints with 88 issues (39% problematic) → 200+ after fixes → 140 after consolidation → 145 after gamification
-**Current:** 145 endpoints, fully functional, no duplicates, with milestone progression gamification
+**Previous:** 138 endpoints with 88 issues (39% problematic) → 200+ after fixes → 140 after consolidation → 145 after gamification → 150 after adding missing endpoints
+**Current:** 150 endpoints, fully functional, no duplicates, with milestone progression gamification
 
 **See:** [CRITICAL_FIXES_SUMMARY.md](CRITICAL_FIXES_SUMMARY.md) for detailed implementation notes
