@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import DashboardLayout from '../components/DashboardLayout';
 import { Target, Lock, CheckCircle, Clock, AlertTriangle, Send } from 'lucide-react';
 import { projectsAPI } from '../services/api';
@@ -8,6 +9,7 @@ import { motion } from 'framer-motion';
 
 const StudentProjectMilestones = () => {
     const { getUserId } = useAuth();
+    const location = useLocation();
     const [team, setTeam] = useState(null);
     const [milestones, setMilestones] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -27,7 +29,17 @@ const StudentProjectMilestones = () => {
                     return;
                 }
 
-                const currentTeam = teams[0];
+                // Prioritize team from location state if available
+                const stateTeamId = location.state?.selectedTeamId;
+                let currentTeam = teams[0];
+
+                if (stateTeamId) {
+                    const foundTeam = teams.find(t => (t.team_id || t._id) === stateTeamId);
+                    if (foundTeam) {
+                        currentTeam = foundTeam;
+                    }
+                }
+
                 setTeam(currentTeam);
 
                 // Fetch milestones (Truth) and Progress (State) in parallel
