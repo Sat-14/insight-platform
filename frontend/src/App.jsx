@@ -41,7 +41,7 @@ function MainLayout({ isConnected }) {
     <>
       <Toaster position="top-right" />
       {/* Navigation - Hidden on StartPage, Student Portal, AND Teacher Portal (which has its own layout) */}
-      {!isStartPage && !location.pathname.startsWith('/student') && !location.pathname.startsWith('/teacher') && !location.pathname.startsWith('/classroom') && (
+      {!isStartPage && !location.pathname.startsWith('/student') && !location.pathname.startsWith('/teacher') && !location.pathname.startsWith('/classroom') && !location.pathname.startsWith('/soft-skills') && (
         <nav className="navbar">
           <h2>AMEP Platform</h2>
 

@@ -1,331 +1,352 @@
-import React, { useState } from 'react';
-import { Award, Target, TrendingUp, Users, BarChart3, CheckCircle, AlertCircle, User, BookOpen, Code2, Sparkles, Zap, Shield, Globe, Workflow } from 'lucide-react';
-
-// Mock data for soft skills rubric
-const mockSkillsData = {
-  dimensions: [
-    {
-      id: 'collaboration',
-      name: 'Collaboration',
-      description: 'Working effectively with peers',
-      indicators: [
-        { id: 'c1', skill: 'Contributes ideas during group discussions', level: 4 },
-        { id: 'c2', skill: 'Listens actively to others', level: 4 },
-        { id: 'c3', skill: 'Resolves conflicts constructively', level: 3 },
-        { id: 'c4', skill: 'Shares responsibilities fairly', level: 4 }
-      ],
-      avgScore: 3.8
-    },
-    {
-      id: 'critical_thinking',
-      name: 'Critical Thinking',
-      description: 'Analyzing and evaluating information',
-      indicators: [
-        { id: 'ct1', skill: 'Asks probing questions', level: 4 },
-        { id: 'ct2', skill: 'Analyzes cause-effect relationships', level: 3 },
-        { id: 'ct3', skill: 'Draws evidence-based conclusions', level: 4 },
-        { id: 'ct4', skill: 'Identifies assumptions and biases', level: 3 }
-      ],
-      avgScore: 3.5
-    },
-    {
-      id: 'communication',
-      name: 'Communication',
-      description: 'Expressing ideas clearly',
-      indicators: [
-        { id: 'com1', skill: 'Uses clear and concise language', level: 4 },
-        { id: 'com2', skill: 'Presents ideas confidently', level: 4 },
-        { id: 'com3', skill: 'Adapts communication to audience', level: 3 },
-        { id: 'com4', skill: 'Provides constructive feedback', level: 4 }
-      ],
-      avgScore: 3.8
-    },
-    {
-      id: 'creativity',
-      name: 'Creativity',
-      description: 'Generating innovative solutions',
-      indicators: [
-        { id: 'cr1', skill: 'Generates multiple solutions', level: 4 },
-        { id: 'cr2', skill: 'Makes novel connections', level: 3 },
-        { id: 'cr3', skill: 'Takes creative risks', level: 4 },
-        { id: 'cr4', skill: 'Implements innovative approaches', level: 3 }
-      ],
-      avgScore: 3.5
-    }
-  ],
-  students: [
-    { id: 's1', name: 'Alice Johnson', scores: { collaboration: 4, critical_thinking: 3, communication: 4, creativity: 3 } },
-    { id: 's2', name: 'Bob Smith', scores: { collaboration: 3, critical_thinking: 4, communication: 3, creativity: 4 } },
-    { id: 's3', name: 'Carol Davis', scores: { collaboration: 4, critical_thinking: 4, communication: 4, creativity: 4 } },
-    { id: 's4', name: 'David Lee', scores: { collaboration: 3, critical_thinking: 3, communication: 3, creativity: 3 } }
-  ],
-  overallScore: 3.7
-};
+import React, { useState, useEffect } from 'react';
+import { Award, Target, TrendingUp, Users, BarChart3, CheckCircle, AlertCircle, User, BookOpen, Code2, Sparkles, Zap, Shield, Globe, Workflow, Loader } from 'lucide-react';
+import TeacherLayout from '../components/TeacherLayout';
+import { useAuth } from '../contexts/AuthContext';
+import { classroomAPI, projectsAPI } from '../services/api';
 
 const SoftSkillsRubric = () => {
+  const { user, getUserId } = useAuth();
   const [activeTab, setActiveTab] = useState('rubric');
-  const [selectedStudent, setSelectedStudent] = useState(null);
-  const [expandedDimension, setExpandedDimension] = useState(null);
+  const [classes, setClasses] = useState([]);
+  const [selectedClassId, setSelectedClassId] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  // Data States
+  const [rubricData, setRubricData] = useState({
+    dimensions: [],
+    overallScore: 0,
+    classAverage: 0
+  });
+  const [studentsData, setStudentsData] = useState([]);
+  const [loadingData, setLoadingData] = useState(false);
+
+  // Initial Data Fetch (Classes)
+  useEffect(() => {
+    const fetchClasses = async () => {
+      try {
+        const userId = getUserId();
+        if (!userId) return;
+
+        const res = await classroomAPI.getTeacherClasses(userId);
+        const fetchedClasses = res.data || [];
+        setClasses(fetchedClasses);
+
+        // Auto-select first class
+        if (fetchedClasses.length > 0) {
+          setSelectedClassId(fetchedClasses[0].classroom_id);
+        }
+      } catch (error) {
+        console.error("Error fetching classes:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchClasses();
+  }, [getUserId]);
+
+  // Fetch Class Data when selectedClassId changes
+  useEffect(() => {
+    const fetchClassData = async () => {
+      if (!selectedClassId) return;
+
+      setLoadingData(true);
+      try {
+        // 1. Fetch Classroom Summary (Rubric Tab)
+        const summaryRes = await projectsAPI.getClassroomSoftSkills(selectedClassId);
+        const summary = summaryRes.data || {};
+
+        // Transform summary data for Rubric View
+        const dimensions = summary.dimension_scores?.map(d => ({
+          id: d.dimension,
+          name: d.skill,
+          description: getDimensionDescription(d.dimension),
+          avgScore: (d.score / 20) // Convert 0-100 back to 0-5 scale for display consisteny with 5-point rubric
+        })) || [];
+
+        setRubricData({
+          dimensions: dimensions,
+          overallScore: (summary.class_average_score / 20) || 0,
+          classAverage: summary.class_average_score || 0
+        });
+
+        // 2. Fetch Students Data (Students Tab)
+        // Since there is no direct "get all students soft skills" endpoint, we iterate
+        const studentsRes = await classroomAPI.getClassroomStudents(selectedClassId);
+        const students = studentsRes.data || [];
+
+        // Fetch soft skills for each student (Optimized: Parallel Requests)
+        const studentPromises = students.map(async (student) => {
+          try {
+            const skillsRes = await projectsAPI.getStudentSoftSkills(student.student_id);
+            const skills = skillsRes.data || {};
+
+            // Map ratings to simpler object { dimension_id: score_1_5 }
+            const scores = {};
+            if (skills.dimension_scores) {
+              Object.entries(skills.dimension_scores).forEach(([key, val]) => {
+                scores[key] = (val.average_rating || 0);
+              });
+            }
+
+            return {
+              id: student.student_id,
+              name: student.name,
+              overall: skills.overall_soft_skills_score ? (skills.overall_soft_skills_score / 20) : 0,
+              scores: scores
+            };
+          } catch (err) {
+            console.warn(`Failed to fetch skills for student ${student.student_id}`, err);
+            return {
+              id: student.student_id,
+              name: student.name,
+              overall: 0,
+              scores: {}
+            };
+          }
+        });
+
+        const studentsWithSkills = await Promise.all(studentPromises);
+        setStudentsData(studentsWithSkills);
+
+      } catch (error) {
+        console.error("Error fetching class soft skills data:", error);
+      } finally {
+        setLoadingData(false);
+      }
+    };
+
+    fetchClassData();
+  }, [selectedClassId]);
+
+  // Helper to get descriptions (since API might not return them in the summary view)
+  const getDimensionDescription = (id) => {
+    const map = {
+      'TEAM_DYNAMICS': 'Quality of interpersonal interactions',
+      'TEAM_STRUCTURE': 'Organization and coordination effectiveness',
+      'TEAM_MOTIVATION': 'Drive and commitment to goals',
+      'TEAM_EXCELLENCE': 'Quality of output and continuous improvement',
+      'COLLABORATION': 'Working effectively with peers',
+      'CRITICAL_THINKING': 'Analyzing and evaluating information',
+      'COMMUNICATION': 'Expressing ideas clearly',
+      'CREATIVITY': 'Generating innovative solutions'
+    };
+    return map[id] || map[id.toUpperCase()] || 'Assessment Dimension';
+  };
 
   const getLevelColor = (level) => {
-    switch(level) {
-      case 1: return 'text-red-400';
-      case 2: return 'text-orange-400';
-      case 3: return 'text-amber-400';
-      case 4: return 'text-green-400';
-      case 5: return 'text-emerald-400';
-      default: return 'text-slate-400';
+    const l = Math.round(level);
+    switch (l) {
+      case 1: return 'text-red-600 bg-red-50';
+      case 2: return 'text-orange-600 bg-orange-50';
+      case 3: return 'text-amber-600 bg-amber-50';
+      case 4: return 'text-green-600 bg-green-50';
+      case 5: return 'text-teal-600 bg-teal-50';
+      default: return 'text-gray-400 bg-gray-50';
     }
   };
 
   const getLevelLabel = (level) => {
-    switch(level) {
+    const l = Math.round(level);
+    switch (l) {
       case 1: return 'Beginning';
       case 2: return 'Developing';
       case 3: return 'Proficient';
       case 4: return 'Advanced';
       case 5: return 'Exceptional';
-      default: return 'Unknown';
+      default: return 'No Data';
     }
   };
 
-  const ProgressRing = ({ percentage, size = 120, strokeWidth = 8 }) => {
-    const radius = (size - strokeWidth) / 2;
-    const circumference = radius * 2 * Math.PI;
-    const offset = circumference - (percentage / 100) * circumference;
-
-    return (
-      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke="rgb(30, 41, 59)"
-          strokeWidth={strokeWidth}
-        />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke="url(#gradient)"
-          strokeWidth={strokeWidth}
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          strokeLinecap="round"
-          style={{
-            transition: 'stroke-dashoffset 2s ease-out',
-          }}
-        />
-        <defs>
-          <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#3b82f6" />
-            <stop offset="100%" stopColor="#06b6d4" />
-          </linearGradient>
-        </defs>
-      </svg>
-    );
-  };
-
   const RubricView = () => (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Overall Score */}
-      <div className="bg-gradient-to-br from-slate-800/50 to-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-8 hover:border-blue-500/50 transition-all duration-500 hover:shadow-2xl hover:shadow-blue-500/20">
-        <div className="flex items-center justify-between mb-8">
+      <div className="bg-white rounded-2xl p-8 border border-gray-200 shadow-sm">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           <div>
-            <h2 className="text-3xl font-bold text-white mb-2">Overall Soft Skills Assessment</h2>
-            <p className="text-slate-400">4-Dimensional Framework with α=0.98 Reliability</p>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Overall Soft Skills Assessment</h2>
+            <p className="text-gray-500">4-Dimensional Framework • Class Average</p>
           </div>
           <div className="text-center">
-            <div className="relative inline-block">
-              <ProgressRing percentage={mockSkillsData.overallScore * 20} size={140} strokeWidth={10} />
-              <div className="absolute inset-0 flex items-center justify-center">
+            <div className="relative inline-flex items-center justify-center">
+              <div className="w-32 h-32 rounded-full border-8 border-teal-100 flex items-center justify-center">
                 <div className="text-center">
-                  <div className="text-4xl font-bold text-white">{mockSkillsData.overallScore.toFixed(1)}</div>
-                  <div className="text-sm text-slate-400">Out of 4.0</div>
+                  <div className="text-4xl font-bold text-teal-600">{rubricData.overallScore.toFixed(1)}</div>
+                  <div className="text-xs text-gray-400 font-bold uppercase">Out of 5.0</div>
                 </div>
               </div>
+              <svg className="absolute top-0 left-0 w-32 h-32 transform -rotate-90 pointer-events-none">
+                <circle
+                  cx="64"
+                  cy="64"
+                  r="58"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="8"
+                  strokeDasharray="365"
+                  strokeDashoffset={365 - (365 * (rubricData.overallScore / 5))}
+                  className="text-teal-500"
+                  strokeLinecap="round"
+                />
+              </svg>
             </div>
           </div>
         </div>
       </div>
 
       {/* Dimensions */}
-      {mockSkillsData.dimensions.map((dimension) => (
-        <div 
-          key={dimension.id} 
-          className="bg-gradient-to-br from-slate-800/50 to-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-8 hover:border-blue-500/50 transition-all duration-500 hover:shadow-2xl hover:shadow-blue-500/20"
-        >
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-slate-700/50 rounded-xl">
-                {dimension.id === 'collaboration' && <Users className="text-cyan-400" size={28} />}
-                {dimension.id === 'critical_thinking' && <Target className="text-cyan-400" size={28} />}
-                {dimension.id === 'communication' && <BookOpen className="text-cyan-400" size={28} />}
-                {dimension.id === 'creativity' && <Sparkles className="text-cyan-400" size={28} />}
+      <div className="grid grid-cols-1 gap-6">
+        {rubricData.dimensions.length > 0 ? (rubricData.dimensions.map((dimension) => (
+          <div
+            key={dimension.id}
+            className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm hover:shadow-md transition-shadow"
+          >
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-teal-50 rounded-xl text-teal-600">
+                  {/* Simplistic Icon Mapping based on typical Strings, fallback to generic */}
+                  {(dimension.id.includes('TEAM') || dimension.id.includes('COLLAB')) ? <Users size={24} /> :
+                    (dimension.id.includes('THINK') || dimension.id.includes('STRUCT')) ? <Target size={24} /> :
+                      (dimension.id.includes('COMM') || dimension.id.includes('MOTIV')) ? <BookOpen size={24} /> :
+                        <Sparkles size={24} />}
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-800">{dimension.name}</h3>
+                  <p className="text-gray-500">{dimension.description}</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-2xl font-bold text-white">{dimension.name}</h3>
-                <p className="text-slate-400">{dimension.description}</p>
+              <div className="text-left md:text-right bg-gray-50 px-4 py-2 rounded-lg">
+                <div className="text-2xl font-bold text-gray-800">{dimension.avgScore.toFixed(1)}</div>
+                <div className="text-xs text-gray-500 font-medium uppercase">Avg Score</div>
               </div>
             </div>
-            <div className="text-right">
-              <div className="text-4xl font-bold text-white">{dimension.avgScore.toFixed(1)}</div>
-              <div className="text-sm text-slate-400">Average Score</div>
-            </div>
-          </div>
 
-          <div className="space-y-4">
-            {dimension.indicators.map((indicator) => (
-              <div key={indicator.id} className="flex items-center justify-between p-4 bg-slate-700/30 rounded-xl border border-slate-600/50">
-                <div className="flex-1">
-                  <p className="text-slate-300 font-medium">{indicator.skill}</p>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className={`text-lg font-bold ${getLevelColor(indicator.level)}`}>
-                    {indicator.level}
-                  </div>
-                  <div className="text-sm text-slate-500 min-w-[100px] text-right">
-                    {getLevelLabel(indicator.level)}
-                  </div>
-                </div>
-              </div>
-            ))}
+            {/* If we had sub-indicators they would go here, but for now we only have dimension level data from summary endpoint */}
+            <div className="w-full bg-gray-100 rounded-full h-3 mt-4">
+              <div
+                className={`h-3 rounded-full ${dimension.avgScore >= 4 ? 'bg-teal-500' : dimension.avgScore >= 3 ? 'bg-amber-400' : 'bg-red-400'}`}
+                style={{ width: `${(dimension.avgScore / 5) * 100}%` }}
+              ></div>
+            </div>
           </div>
-        </div>
-      ))}
+        ))) : (
+          <div className="p-12 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-300 text-gray-500">
+            No soft skills data found for this class yet. Start a project and submit peer reviews to see data.
+          </div>
+        )}
+      </div>
     </div>
   );
 
   const StudentsView = () => (
-    <div className="space-y-6">
-      {mockSkillsData.students.map((student) => (
-        <div 
-          key={student.id} 
-          className="bg-gradient-to-br from-slate-800/50 to-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 hover:border-blue-500/50 transition-all duration-500 hover:shadow-2xl hover:shadow-blue-500/20"
+    <div className="grid grid-cols-1 gap-6">
+      {studentsData.length > 0 ? (studentsData.map((student) => (
+        <div
+          key={student.id}
+          className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm hover:shadow-md transition-all"
         >
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-blue-500/30">
+              <div className="w-12 h-12 bg-teal-100 text-teal-700 rounded-full flex items-center justify-center font-bold text-lg">
                 {student.name.charAt(0)}
               </div>
               <div>
-                <h3 className="text-xl font-bold text-white">{student.name}</h3>
-                <p className="text-slate-400">Individual Assessment</p>
+                <h3 className="text-lg font-bold text-gray-800">{student.name}</h3>
+                <p className="text-sm text-gray-500">Individual Assessment</p>
               </div>
             </div>
             <div className="text-right">
-              <div className="text-2xl font-bold text-white">
-                {(Object.values(student.scores).reduce((a, b) => a + b, 0) / 4).toFixed(1)}
+              <div className="text-2xl font-bold text-gray-800">
+                {student.overall.toFixed(1)}
               </div>
-              <div className="text-sm text-slate-400">Overall Score</div>
+              <div className="text-xs text-gray-500 uppercase font-bold">Overall</div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {Object.entries(student.scores).map(([skill, score]) => (
-              <div key={skill} className="p-4 bg-slate-700/30 rounded-xl border border-slate-600/50">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-slate-300 capitalize">{skill.replace('_', ' ')}</span>
-                  <span className={`text-lg font-bold ${getLevelColor(score)}`}>{score}</span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {Object.entries(student.scores).length > 0 ? (Object.entries(student.scores).map(([skill, score]) => (
+              <div key={skill} className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-gray-600 text-sm font-medium capitalize">{skill.replace('_', ' ').toLowerCase()}</span>
+                  <span className={`text-sm font-bold px-2 py-0.5 rounded ${getLevelColor(score)}`}>{score.toFixed(1)}</span>
                 </div>
-                <div className="w-full bg-slate-600 rounded-full h-2">
-                  <div 
-                    className={`h-2 rounded-full bg-gradient-to-r ${score === 1 ? 'from-red-500 to-red-600' : score === 2 ? 'from-orange-500 to-amber-500' : score === 3 ? 'from-amber-500 to-yellow-500' : score === 4 ? 'from-green-500 to-emerald-500' : 'from-emerald-500 to-teal-500'}`}
-                    style={{ width: `${score * 20}%` }}
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className={`h-2 rounded-full ${score >= 4 ? 'bg-teal-500' : score >= 3 ? 'bg-amber-500' : 'bg-red-500'}`}
+                    style={{ width: `${(score / 5) * 100}%` }}
                   ></div>
                 </div>
               </div>
-            ))}
+            ))) : (
+              <div className="col-span-4 text-center text-sm text-gray-400 py-2">
+                No peer review data available for this student.
+              </div>
+            )}
           </div>
         </div>
-      ))}
+      ))) : (
+        <div className="p-12 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-300 text-gray-500">
+          No students found in this class.
+        </div>
+      )}
     </div>
   );
 
   const AnalyticsView = () => (
-    <div className="space-y-8">
-      <div className="bg-gradient-to-br from-slate-800/50 to-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-8 hover:border-blue-500/50 transition-all duration-500 hover:shadow-2xl hover:shadow-blue-500/20">
-        <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
-          <BarChart3 className="text-cyan-400" />
+    <div className="space-y-6">
+      <div className="bg-white rounded-2xl p-8 border border-gray-200 shadow-sm">
+        <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+          <BarChart3 className="text-teal-600" />
           Skill Distribution Analysis
         </h3>
-        
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div>
-            <h4 className="text-lg font-bold text-white mb-4">Class Average by Dimension</h4>
+            <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">Class Average by Dimension</h4>
             <div className="space-y-4">
-              {mockSkillsData.dimensions.map((dimension) => (
-                <div key={dimension.id} className="p-4 bg-slate-700/30 rounded-xl border border-slate-600/50">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-slate-300">{dimension.name}</span>
-                    <span className="text-white font-bold">{dimension.avgScore.toFixed(1)}</span>
+              {rubricData.dimensions.map((dimension) => (
+                <div key={dimension.id}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-gray-700 font-medium">{dimension.name}</span>
+                    <span className="text-gray-900 font-bold">{dimension.avgScore.toFixed(1)}</span>
                   </div>
-                  <div className="w-full bg-slate-600 rounded-full h-3">
-                    <div 
-                      className="h-3 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500"
-                      style={{ width: `${(dimension.avgScore / 4) * 100}%` }}
+                  <div className="w-full bg-gray-100 rounded-full h-3">
+                    <div
+                      className="h-3 rounded-full bg-teal-500"
+                      style={{ width: `${(dimension.avgScore / 5) * 100}%` }}
                     ></div>
                   </div>
                 </div>
               ))}
             </div>
           </div>
-          
+
           <div>
-            <h4 className="text-lg font-bold text-white mb-4">Skill Level Distribution</h4>
+            <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">Skill Level Distribution</h4>
+            {/* Mock distribution for now as API doesn't provide buckets yet, but we can compute from studentsData if needed */}
+            <div className="p-4 bg-yellow-50 text-yellow-800 rounded-lg text-sm mb-4">
+              Note: Distribution is currently estimated based on available student data.
+            </div>
             <div className="space-y-4">
-              {[1, 2, 3, 4, 5].map((level) => (
-                <div key={level} className="p-4 bg-slate-700/30 rounded-xl border border-slate-600/50">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-slate-300">{getLevelLabel(level)}</span>
-                    <span className="text-white font-bold">{level}</span>
-                  </div>
-                  <div className="w-full bg-slate-600 rounded-full h-3">
-                    <div 
-                      className={`h-3 rounded-full ${level === 1 ? 'bg-red-500' : level === 2 ? 'bg-orange-500' : level === 3 ? 'bg-amber-500' : level === 4 ? 'bg-green-500' : 'bg-emerald-500'}`}
-                      style={{ width: `${Math.floor(Math.random() * 30) + 10}%` }}
-                    ></div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
+              {[5, 4, 3, 2, 1].map((level) => {
+                // Simple computation from studentsData if available
+                const studentsAtLevel = studentsData.filter(s => Math.round(s.overall) === level).length;
+                const percentage = studentsData.length > 0 ? (studentsAtLevel / studentsData.length) * 100 : 0;
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-gradient-to-br from-slate-800/50 to-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 hover:border-blue-500/50 transition-all duration-500 hover:shadow-2xl hover:shadow-blue-500/20">
-          <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-            <TrendingUp className="text-cyan-400" />
-            Improvement Areas
-          </h4>
-          <div className="space-y-3">
-            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
-              <p className="text-red-400">Critical Thinking (3.5)</p>
-              <p className="text-sm text-slate-400">Focus on analytical reasoning</p>
-            </div>
-            <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-              <p className="text-amber-400">Creativity (3.5)</p>
-              <p className="text-sm text-slate-400">Encourage innovative approaches</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-slate-800/50 to-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 hover:border-blue-500/50 transition-all duration-500 hover:shadow-2xl hover:shadow-blue-500/20">
-          <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-            <CheckCircle className="text-cyan-400" />
-            Strength Areas
-          </h4>
-          <div className="space-y-3">
-            <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-              <p className="text-green-400">Collaboration (3.8)</p>
-              <p className="text-sm text-slate-400">Excellent teamwork skills</p>
-            </div>
-            <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
-              <p className="text-emerald-400">Communication (3.8)</p>
-              <p className="text-sm text-slate-400">Strong presentation abilities</p>
+                return (
+                  <div key={level}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-gray-700 font-medium">{getLevelLabel(level)} ({level})</span>
+                      <span className="text-gray-900 font-bold">{percentage.toFixed(0)}%</span>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-3">
+                      <div
+                        className={`h-3 rounded-full ${level >= 4 ? 'bg-teal-500' : level >= 3 ? 'bg-amber-400' : 'bg-red-400'}`}
+                        style={{ width: `${percentage}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </div>
         </div>
@@ -334,78 +355,113 @@ const SoftSkillsRubric = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 p-6">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-400 via-cyan-400 to-violet-400 bg-clip-text text-transparent mb-3">🏆 Soft Skills Assessment</h1>
-        <p className="text-slate-400 text-xl">BR5: Validated 4-Dimension Framework • α=0.98 Reliability</p>
-      </div>
+    <TeacherLayout>
+      <div className="min-h-screen">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-800 mb-2 flex items-center gap-3">
+                <Award className="text-teal-600" size={32} />
+                Soft Skills Assessment
+              </h1>
+              <p className="text-gray-500">Track and assess student development in key 21st-century competencies.</p>
+            </div>
 
-      {/* Navigation Tabs */}
-      <div className="flex gap-4 mb-8 overflow-x-auto pb-2">
-        <button
-          onClick={() => setActiveTab('rubric')}
-          className={`px-6 py-4 rounded-xl font-bold transition-all duration-300 whitespace-nowrap ${
-            activeTab === 'rubric'
-              ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg shadow-blue-500/50'
-              : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <Target className="text-cyan-400" />
-            Rubric
+            {/* Classroom Selector */}
+            <div className="min-w-[250px]">
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Select Classroom</label>
+              <select
+                value={selectedClassId}
+                onChange={(e) => setSelectedClassId(e.target.value)}
+                className="w-full p-3 bg-white border border-gray-200 rounded-xl font-bold text-gray-700 focus:ring-2 focus:ring-teal-500 outline-none shadow-sm"
+                disabled={loading}
+              >
+                {loading && <option>Loading classes...</option>}
+                {!loading && classes.length === 0 && <option>No classes found</option>}
+                {classes.map(cls => (
+                  <option key={cls.classroom_id} value={cls.classroom_id}>
+                    {cls.class_name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
-        </button>
-        <button
-          onClick={() => setActiveTab('students')}
-          className={`px-6 py-4 rounded-xl font-bold transition-all duration-300 whitespace-nowrap ${
-            activeTab === 'students'
-              ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg shadow-blue-500/50'
-              : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <Users className="text-cyan-400" />
-            Students
-          </div>
-        </button>
-        <button
-          onClick={() => setActiveTab('analytics')}
-          className={`px-6 py-4 rounded-xl font-bold transition-all duration-300 whitespace-nowrap ${
-            activeTab === 'analytics'
-              ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg shadow-blue-500/50'
-              : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <BarChart3 className="text-cyan-400" />
-            Analytics
-          </div>
-        </button>
-      </div>
+        </div>
 
-      {/* Content */}
-      {activeTab === 'rubric' && <RubricView />}
-      {activeTab === 'students' && <StudentsView />}
-      {activeTab === 'analytics' && <AnalyticsView />}
+        {/* Navigation Tabs */}
+        <div className="flex gap-2 mb-8 border-b border-gray-200">
+          <button
+            onClick={() => setActiveTab('rubric')}
+            className={`px-6 py-3 font-bold transition-all border-b-2 ${activeTab === 'rubric'
+                ? 'border-teal-600 text-teal-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+          >
+            <div className="flex items-center gap-2">
+              <Target size={18} />
+              Rubric
+            </div>
+          </button>
+          <button
+            onClick={() => setActiveTab('students')}
+            className={`px-6 py-3 font-bold transition-all border-b-2 ${activeTab === 'students'
+                ? 'border-teal-600 text-teal-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+          >
+            <div className="flex items-center gap-2">
+              <Users size={18} />
+              Students
+            </div>
+          </button>
+          <button
+            onClick={() => setActiveTab('analytics')}
+            className={`px-6 py-3 font-bold transition-all border-b-2 ${activeTab === 'analytics'
+                ? 'border-teal-600 text-teal-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+          >
+            <div className="flex items-center gap-2">
+              <BarChart3 size={18} />
+              Analytics
+            </div>
+          </button>
+        </div>
 
-      {/* Research Citation */}
-      <div className="mt-8 bg-gradient-to-r from-purple-500/10 to-violet-500/10 border border-purple-500/20 p-6 rounded-2xl">
-        <p className="text-slate-300 font-medium mb-2 flex items-center gap-2">
-          <Shield className="text-purple-400" />
-          Research-Backed Design
-        </p>
-        <p className="text-slate-300">
-          The 4-dimensional soft skills framework incorporates collaboration, critical thinking, communication, 
-          and creativity dimensions. Validated with α=0.98 Cronbach's reliability coefficient, this assessment 
-          tool provides objective measurement of 21st-century competencies essential for student success.
-        </p>
-        <p className="text-slate-500 mt-3 flex items-center gap-2">
-          <Award className="text-purple-400" />
-          — Paper 18.pdf: Assessment Framework Validation Study
-        </p>
+        {/* Content */}
+        {loadingData ? (
+          <div className="py-20 flex justify-center">
+            <Loader className="animate-spin text-teal-600" size={40} />
+          </div>
+        ) : (
+          <>
+            {activeTab === 'rubric' && <RubricView />}
+            {activeTab === 'students' && <StudentsView />}
+            {activeTab === 'analytics' && <AnalyticsView />}
+          </>
+        )}
+
+        {/* Research Citation */}
+        <div className="mt-8 bg-indigo-50 border border-indigo-100 p-6 rounded-2xl">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-indigo-100 rounded-lg text-indigo-600">
+              <Shield size={20} />
+            </div>
+            <div>
+              <p className="text-indigo-900 font-bold mb-1">
+                Research-Backed Framework
+              </p>
+              <p className="text-indigo-700 text-sm leading-relaxed">
+                The 4-dimensional soft skills framework incorporates collaboration, critical thinking, communication,
+                and creativity dimensions. Validated with α=0.98 Cronbach's reliability coefficient, this assessment
+                tool provides objective measurement of 21st-century competencies essential for student success.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
+    </TeacherLayout>
   );
 };
 
