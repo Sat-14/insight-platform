@@ -18,6 +18,8 @@ const StudentAttendance = () => {
   const [hasRegisteredIP, setHasRegisteredIP] = useState(false);
   const [registeredIPAddress, setRegisteredIPAddress] = useState(null);
 
+  const [capturedPhoto, setCapturedPhoto] = useState(null);
+
   const videoRef = useRef(null);
   const streamRef = useRef(null);
 
@@ -42,12 +44,13 @@ const StudentAttendance = () => {
 
   // Start/stop camera based on eligibility
   useEffect(() => {
-    if (canMark && !cameraActive) {
+    // Only start camera if we can mark AND we haven't already captured a photo
+    if (canMark && !cameraActive && !capturedPhoto) {
       startCamera();
-    } else if (!canMark && cameraActive) {
+    } else if ((!canMark || capturedPhoto) && cameraActive) {
       stopCamera();
     }
-  }, [canMark]);
+  }, [canMark, capturedPhoto]);
 
   const checkIPRegistration = async () => {
     try {
@@ -143,36 +146,36 @@ const StudentAttendance = () => {
   };
 
   const capturePhoto = () => {
-    return new Promise((resolve) => {
-      if (!videoRef.current || videoRef.current.readyState !== 4) { // HAVE_ENOUGH_DATA
-        console.warn("Video not ready for capture");
-        // Try anyway, or handle error?
-      }
+    if (!videoRef.current || videoRef.current.readyState !== 4) { // HAVE_ENOUGH_DATA
+      console.warn("Video not ready for capture");
+      return;
+    }
 
-      const canvas = document.createElement('canvas');
-      canvas.width = 640;
-      canvas.height = 480;
+    const canvas = document.createElement('canvas');
+    canvas.width = 640;
+    canvas.height = 480;
 
-      const context = canvas.getContext('2d');
-      // Flip horizontally for consistency with user-facing camera if needed
-      // context.translate(canvas.width, 0);
-      // context.scale(-1, 1);
+    const context = canvas.getContext('2d');
+    context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
 
-      context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+    const photoBase64 = canvas.toDataURL('image/jpeg', 0.8);
+    setCapturedPhoto(photoBase64);
+    // Camera will stop automatically via useEffect when capturedPhoto is set
+  };
 
-      // Verify not empty
-      const pixelData = context.getImageData(0, 0, 1, 1).data;
-      console.log('Capture sample pixel:', pixelData);
-
-      const photoBase64 = canvas.toDataURL('image/jpeg', 0.8);
-      console.log('Photo captured, length:', photoBase64.length);
-      resolve(photoBase64);
-    });
+  const retakePhoto = () => {
+    setCapturedPhoto(null);
+    // Camera will start automatically via useEffect when capturedPhoto is null
   };
 
   const markAttendance = async () => {
     if (!canMark) {
       toast.error('Cannot mark attendance. Check requirements.');
+      return;
+    }
+
+    if (!capturedPhoto) {
+      toast.error('Please capture a photo first.');
       return;
     }
 
@@ -183,11 +186,6 @@ const StudentAttendance = () => {
       toast.loading('Getting your location...');
       const position = await getCurrentLocation();
 
-      // Capture photo
-      toast.dismiss();
-      toast.loading('Capturing photo...');
-      const photo = await capturePhoto();
-
       // Submit attendance
       toast.dismiss();
       toast.loading('Submitting attendance...');
@@ -196,15 +194,15 @@ const StudentAttendance = () => {
         session_id: session._id,
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
-        photo: photo
+        photo: capturedPhoto
       });
 
       toast.dismiss();
       toast.success('Attendance marked successfully! ✅');
 
-      // Stop camera and disable button
-      stopCamera();
+      // Clear state
       setCanMark(false);
+      setCapturedPhoto(null);
 
     } catch (error) {
       toast.dismiss();
@@ -327,32 +325,64 @@ const StudentAttendance = () => {
         )}
 
         {/* Camera and Capture */}
-        {canMark && cameraActive && (
+        {canMark && (
           <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold mb-4">Capture Your Photo</h2>
+            <h2 className="text-xl font-semibold mb-4">
+              {capturedPhoto ? 'Review Photo' : 'Capture Your Photo'}
+            </h2>
 
             <div className="mb-4 relative">
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className="w-full max-w-2xl mx-auto rounded-lg border-4 border-blue-500 bg-black"
-                style={{ minHeight: '300px' }}
-              />
-              <div className="absolute top-4 right-4 bg-red-600 text-white px-3 py-1 rounded-full text-xs animate-pulse">
-                REC
-              </div>
+              {capturedPhoto ? (
+                <img
+                  src={capturedPhoto}
+                  alt="Captured"
+                  className="w-full max-w-2xl mx-auto rounded-lg border-4 border-green-500"
+                  style={{ minHeight: '300px', objectFit: 'cover' }}
+                />
+              ) : (
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full max-w-2xl mx-auto rounded-lg border-4 border-blue-500 bg-black"
+                  style={{ minHeight: '300px' }}
+                />
+              )}
+
+              {!capturedPhoto && (
+                <div className="absolute top-4 right-4 bg-red-600 text-white px-3 py-1 rounded-full text-xs animate-pulse">
+                  REC
+                </div>
+              )}
             </div>
 
-            <div className="text-center">
-              <button
-                onClick={markAttendance}
-                disabled={loading}
-                className="px-8 py-4 bg-green-600 text-white text-xl rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? 'Submitting...' : '📸 Capture & Submit Attendance'}
-              </button>
+            <div className="flex justify-center gap-4">
+              {!capturedPhoto ? (
+                <button
+                  onClick={capturePhoto}
+                  className="px-8 py-4 bg-blue-600 text-white text-xl rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                >
+                  <span className="text-2xl">📸</span> Capture Photo
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={retakePhoto}
+                    disabled={loading}
+                    className="px-6 py-4 bg-gray-500 text-white text-lg rounded-lg hover:bg-gray-600 disabled:opacity-50"
+                  >
+                    Retake
+                  </button>
+                  <button
+                    onClick={markAttendance}
+                    disabled={loading}
+                    className="px-8 py-4 bg-green-600 text-white text-xl rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    Submit Attendance <span className="text-2xl">✅</span>
+                  </button>
+                </>
+              )}
             </div>
 
             <p className="text-center text-sm text-gray-500 mt-4">
