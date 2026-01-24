@@ -209,6 +209,7 @@ export const dashboardAPI = {
   dismissStudentAlerts: (studentId) => api.post(`/engagement/alerts/student/${studentId}/dismiss`),
   deleteIntervention: (interventionId) => api.delete(`/dashboard/interventions/${interventionId}`),
   getAdminTeacherStats: () => api.get('/dashboard/admin/teachers'),
+  getInterestPath: () => api.get('/interest/path'),
 };
 
 export const attendanceAPI = {
