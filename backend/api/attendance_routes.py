@@ -16,7 +16,9 @@ from models.database import (
     STUDENTS,
     ATTENDANCE_SESSIONS,
     ATTENDANCE_RECORDS,
-    CLASSROOMS
+    CLASSROOMS,
+    CLASSROOM_MEMBERSHIPS,
+    TEACHERS
 )
 from utils.logger import get_logger
 
@@ -643,6 +645,7 @@ def get_active_student_sessions():
                 'room': classroom.get('room', ''),
                 'teacher_name': teacher_name,
                 'closes_at': session['closes_at'].isoformat(),
+                'radius_meters': session.get('radius_meters', 100),
                 'can_mark': can_mark,
                 'reason': reason
             })

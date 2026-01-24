@@ -348,7 +348,32 @@ const StudentAttendance = () => {
               <h2 className="text-xl font-bold text-gray-800">{selectedSession.classroom_name}</h2>
               <div className="flex justify-between items-center mt-1">
                 <p className="text-sm text-gray-500">Instructor: {selectedSession.teacher_name}</p>
-                {!canMark && <span className="text-xs font-bold text-red-500">{statusReason}</span>}
+              </div>
+
+              {/* Restored Status Block */}
+              <div className="mt-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-2">
+                <div className="flex items-center gap-3">
+                  <div className="text-green-500"><CheckCircle size={20} /></div>
+                  <span className="text-gray-700 font-medium">Session is Open</span>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className={(!selectedSession.reason || !selectedSession.reason.includes('IP')) ? "text-green-500" : "text-red-500"}>
+                    {(!selectedSession.reason || !selectedSession.reason.includes('IP')) ? <CheckCircle size={20} /> : <AlertTriangle size={20} />}
+                  </div>
+                  <span className={(!selectedSession.reason || !selectedSession.reason.includes('IP')) ? "text-gray-700 font-medium" : "text-red-600 font-medium"}>
+                    Device Verified
+                    {selectedSession.reason?.includes('IP') && <span className="block text-xs font-normal">Please use your registered device</span>}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="text-blue-500"><MapPin size={20} /></div>
+                  <span className="text-gray-700 font-medium">
+                    Location check on submit
+                    <span className="text-gray-500 font-normal text-sm ml-1">(Within {selectedSession.radius_meters || 100}m)</span>
+                  </span>
+                </div>
               </div>
             </div>
 
