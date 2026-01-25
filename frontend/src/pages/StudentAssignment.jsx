@@ -174,6 +174,36 @@ const StudentAssignment = () => {
                                 <div className="prose text-[#EAE0CF]/80">
                                     {assignment.content || assignment.description || "No instructions provided."}
                                 </div>
+
+                                {console.log("[StudentAssignment] Assignment Attachments:", assignment.attachments)}
+
+                                {/* Attachments Display */}
+                                {(assignment.attachments?.length > 0 || assignment.assignment_details?.attachments?.length > 0) && (
+                                    <div className="mt-6">
+                                        <h4 className="font-bold text-[#EAE0CF] text-sm mb-3 flex items-center gap-2">
+                                            <FileText size={16} /> Attachments
+                                        </h4>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            {[...(assignment.attachments || []), ...(assignment.assignment_details?.attachments || [])].filter((v, i, a) => a.findIndex(t => (t.url === v.url)) === i).map((att, idx) => (
+                                                <a
+                                                    key={idx}
+                                                    href={att.url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="flex items-center gap-3 bg-[#213448] p-3 rounded-xl border border-[#EAE0CF]/10 hover:border-[#EAE0CF]/30 hover:bg-[#2a4055] transition-all group"
+                                                >
+                                                    <div className="bg-[#547792]/20 p-2 rounded-lg text-[#EAE0CF] group-hover:text-white transition-colors">
+                                                        <FileText size={20} />
+                                                    </div>
+                                                    <div className="overflow-hidden">
+                                                        <p className="font-bold text-[#EAE0CF] text-sm truncate group-hover:text-white transition-colors">{att.name}</p>
+                                                        <p className="text-[#EAE0CF]/50 text-xs">Click to view</p>
+                                                    </div>
+                                                </a>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
