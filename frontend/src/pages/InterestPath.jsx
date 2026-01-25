@@ -8,6 +8,7 @@ import { motion } from 'framer-motion';
 const InterestPath = () => {
     const [interestData, setInterestData] = useState([]);
     const [learningPath, setLearningPath] = useState(null);
+    const [searchHistory, setSearchHistory] = useState([]);
     const [interestInput, setInterestInput] = useState('');
     const [generating, setGenerating] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -25,6 +26,9 @@ const InterestPath = () => {
                 }
                 if (response.data.learning_path) {
                     setLearningPath(response.data.learning_path);
+                }
+                if (response.data.search_history) {
+                    setSearchHistory(response.data.search_history);
                 }
             }
         } catch (error) {
@@ -106,7 +110,7 @@ const InterestPath = () => {
                             </ResponsiveContainer>
                         </div>
                         <p className="text-center text-sm text-gray-400 mt-4">
-                            * Score = Weighted average of Concept Mastery (70%) & Project Engagement (30%)
+                            * Score = Weighted average of Mastery (60%), Projects (20%), & Search Interest (20%)
                         </p>
                     </div>
 
@@ -130,6 +134,31 @@ const InterestPath = () => {
                                     </motion.div>
                                 )) : (
                                     <p className="text-white/70 text-sm">Complete more lessons to unlock recommendations!</p>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Recent Explorations (History) */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-orange-100 p-6">
+                            <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                <Clock className="text-orange-500" size={20} /> Recent Explorations
+                            </h2>
+                            <div className="space-y-3 max-h-60 overflow-y-auto custom-scrollbar pr-2">
+                                {searchHistory.length > 0 ? searchHistory.map((item, idx) => (
+                                    <div key={idx} className="flex justify-between items-center p-3 hover:bg-orange-50 rounded-lg transition-colors group">
+                                        <div className="flex items-center gap-3 overflow-hidden">
+                                            <div className="bg-orange-100 p-2 rounded-lg text-orange-600 shrink-0">
+                                                <Zap size={14} />
+                                            </div>
+                                            <span className="text-sm font-medium text-gray-700 truncate">{item.query}</span>
+                                        </div>
+                                        <span className="text-xs text-gray-400 whitespace-nowrap">{item.date}</span>
+                                    </div>
+                                )) : (
+                                    <div className="text-center py-6 text-gray-400 text-sm">
+                                        <p>No search history yet.</p>
+                                        <p className="text-xs mt-1">Try generating a path!</p>
+                                    </div>
                                 )}
                             </div>
                         </div>
