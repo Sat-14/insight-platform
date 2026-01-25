@@ -163,12 +163,12 @@ const StudentAchievements = () => {
                     <div className="flex-1 w-full">
                         <div className="flex justify-between items-end mb-2">
                             <div>
-                                <h3 className="font-bold text-xl text-[#065F46]">Experience Points</h3>
-                                <p className="text-[#065F46]/70 text-sm">Keep earning XP to reach Level {displayProfile.level + 1}</p>
+                                <h3 className="font-bold text-xl text-white">Experience Points</h3>
+                                <p className="text-white/70 text-sm">Keep earning XP to reach Level {displayProfile.level + 1}</p>
                             </div>
                             <div className="text-right">
                                 <span className="font-bold text-yellow-500 text-lg">{displayProfile.current_level_xp}</span>
-                                <span className="text-[#EAE0CF]/40 font-medium"> / {displayProfile.next_level_xp} XP</span>
+                                <span className="text-white/40 font-medium"> / {displayProfile.next_level_xp} XP</span>
                             </div>
                         </div>
                         <div className="h-4 bg-[#1a2c3d] rounded-full overflow-hidden border border-[#EAE0CF]/5">

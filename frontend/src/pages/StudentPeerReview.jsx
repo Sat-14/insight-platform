@@ -127,6 +127,14 @@ const StudentPeerReview = () => {
 
     return (
         <DashboardLayout>
+            <header className="mb-8">
+                <h1 className="text-3xl font-bold text-[#065F46] flex items-center gap-3">
+                    <Users className="text-[#065F46]" size={32} />
+                    Peer Review
+                </h1>
+                <p className="text-[#065F46]/70 mt-2">Evaluate your team members' performance and collaboration.</p>
+            </header>
+
             <div className="bg-[#213448] rounded-2xl shadow-sm border border-[#EAE0CF]/20 p-6 mb-8">
                 <h2 className="font-bold text-white mb-4 flex items-center gap-2 text-lg">
                     <User size={20} className="text-white" />
