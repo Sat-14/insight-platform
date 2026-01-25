@@ -71,6 +71,13 @@ const StudentAssignment = () => {
         console.log("[StudentAssignment] Submitting assignment...");
         if (!submissionText.trim() && !attachment) return;
 
+        const studentId = user?.user_id || user?.id;
+        if (!studentId) {
+            console.error("[StudentAssignment] No student ID found in user object:", user);
+            setError("User identification failed. Please reload.");
+            return;
+        }
+
         try {
             setSubmitting(true);
             let attachmentUrl = null;
@@ -88,22 +95,21 @@ const StudentAssignment = () => {
                 name: attachment.name
             }] : [];
 
-            await classroomAPI.submitAssignment(assignmentId, {
-                student_id: user?.user_id || user?.id,
+            const payload = {
+                student_id: studentId,
                 submission_text: submissionText,
                 attachments: attachments
-            });
-            console.log("[StudentAssignment] Submission payload:", {
-                student_id: user?.user_id || user?.id,
-                submission_text: submissionText,
-                attachments: attachments
-            });
+            };
+
+            console.log("[StudentAssignment] Sending payload:", payload);
+
+            await classroomAPI.submitAssignment(assignmentId, payload);
             console.log("[StudentAssignment] Submission success");
             setSubmitted(true);
 
             // Trigger engagement update
             try {
-                await engagementAPI.analyzeEngagement({ student_id: user?.user_id || user?.id });
+                await engagementAPI.analyzeEngagement({ student_id: studentId });
             } catch (e) {
                 console.error("Failed to update engagement stats", e);
             }
@@ -113,7 +119,19 @@ const StudentAssignment = () => {
             }, 2000);
         } catch (err) {
             console.error("Submission error:", err);
-            setError("Failed to submit assignment. Please try again.");
+
+            // Handle "Already submitted" case by syncing state
+            if (err.response?.status === 400 && err.response?.data?.error?.includes('already submitted')) {
+                console.warn("[StudentAssignment] State mismatch detected. Assignment was already submitted.");
+                setSubmitted(true);
+                // Optionally re-fetch assignment to show the submission
+                const response = await classroomAPI.getAssignment(assignmentId);
+                if (response.data.current_user_submission) {
+                    setSubmissionText(response.data.current_user_submission.submission_text || '');
+                }
+            } else {
+                setError(err.response?.data?.error || "Failed to submit assignment. Please try again.");
+            }
         } finally {
             setSubmitting(false);
         }

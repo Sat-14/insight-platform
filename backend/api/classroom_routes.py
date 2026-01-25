@@ -688,11 +688,19 @@ def get_classroom_stream(classroom_id):
 
             # If user is student, check for submission
             user_id, role = get_current_user_id()
-            if user_id and role == 'student' and post.get('post_type') == 'assignment':
+             
+            # DEBUG LOGGING for stream submission check
+            if post.get('post_type') == 'assignment':
+                 logger.info(f"Stream check | post: {post['_id']} | user: {user_id} | role: {role}")
+                 print(f"DEBUG: Stream check | post: {post['_id']} | user: {user_id} | role: {role}", flush=True)
+
+            # Relaxed check: strict role check might fail if token role varies (e.g. 'Student' vs 'student')
+            if user_id and post.get('post_type') == 'assignment':
                 submission = find_one(CLASSROOM_SUBMISSIONS, {
                     'assignment_id': post['_id'],
                     'student_id': user_id
                 })
+                logger.info(f"Submission found: {submission['_id'] if submission else 'None'}")
                 if submission:
                     post_data['current_user_submission'] = {
                         'status': submission.get('status'),
